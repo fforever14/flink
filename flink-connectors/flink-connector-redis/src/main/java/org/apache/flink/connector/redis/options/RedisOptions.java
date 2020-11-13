@@ -97,7 +97,7 @@ public class RedisOptions {
 				redisIp,
 				Integer.parseInt(redisPort),
 				Integer.parseInt(databaseIndex),
-				redisTypeflink
+				redisType
 			);
 		}
 	}
