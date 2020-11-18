@@ -56,6 +56,8 @@ public class DeploymentEntry extends ConfigEntry {
 
 	private static final String DEPLOYMENT_GATEWAY_PORT = "gateway-port";
 
+	private static final String DEPLOYMENT_APPLICATION_ID = "yid";
+
 	private DeploymentEntry(DescriptorProperties properties) {
 		super(properties);
 	}
@@ -65,6 +67,7 @@ public class DeploymentEntry extends ConfigEntry {
 		properties.validateLong(DEPLOYMENT_RESPONSE_TIMEOUT, true, 0);
 		properties.validateString(DEPLOYMENT_GATEWAY_ADDRESS, true, 0);
 		properties.validateInt(DEPLOYMENT_GATEWAY_PORT, true, 0, 65535);
+		properties.validateString(DEPLOYMENT_APPLICATION_ID, true, 0);
 	}
 
 	public long getResponseTimeout() {
@@ -80,6 +83,11 @@ public class DeploymentEntry extends ConfigEntry {
 	public int getGatewayPort() {
 		return properties.getOptionalInt(DEPLOYMENT_GATEWAY_PORT)
 			.orElseGet(() -> useDefaultValue(DEPLOYMENT_GATEWAY_PORT, 0));
+	}
+
+	public String getDeploymentApplicationId() {
+		return properties.getOptionalString(DEPLOYMENT_APPLICATION_ID)
+			.orElseGet(() -> useDefaultValue(DEPLOYMENT_APPLICATION_ID, ""));
 	}
 
 	/**

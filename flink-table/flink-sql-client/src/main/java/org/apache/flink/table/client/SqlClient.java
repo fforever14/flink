@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.client;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.client.cli.CliClient;
 import org.apache.flink.table.client.cli.CliOptions;
@@ -91,11 +92,16 @@ public class SqlClient {
 			} else {
 				libDirs = Collections.emptyList();
 			}
-			final Executor executor = new LocalExecutor(options.getDefaults(), jars, libDirs);
-			executor.start();
+			final Executor executor = new LocalExecutor(options.getDefaults(), jars, libDirs, options.getConfiguration());
+			executor.start();  //nothing done
 
 			// create CLI client with session environment
 			final Environment sessionEnv = readSessionEnvironment(options.getEnvironment());
+			Map<String, Object> deployMap = new HashMap<>();
+			options.getConfiguration().toMap().forEach((key, val) -> {
+				deployMap.put(key, val);
+			});
+			sessionEnv.setDeployment(deployMap);
 			appendPythonConfig(sessionEnv, options.getPythonConfiguration());
 			final SessionContext context;
 			if (options.getSessionId() == null) {
@@ -137,16 +143,21 @@ public class SqlClient {
 						SystemUtils.IS_OS_WINDOWS ? "flink-sql-history" : ".flink-sql-history");
 			}
 			cli = new CliClient(sessionId, executor, historyFilePath);
-			// interactive CLI mode
-			if (options.getUpdateStatement() == null) {
-				cli.open();
-			}
-			// execute single update statement
-			else {
+			if (StringUtils.isNotBlank(options.getSqlFilePath())) {
+				// execute sql file
+				final boolean success = cli.executeFile(options.getSqlFilePath(), options.isRunAsOnce());
+				if (!success) {
+					throw new SqlClientException("Could not execute given SQL file to cluster.");
+				}
+			} else if (StringUtils.isNotBlank(options.getUpdateStatement())) {
+				// execute single update statement
 				final boolean success = cli.submitUpdate(options.getUpdateStatement());
 				if (!success) {
 					throw new SqlClientException("Could not submit given SQL update statement to cluster.");
 				}
+			} else {
+				// interactive CLI mode
+				cli.open();
 			}
 		} finally {
 			if (cli != null) {
@@ -193,6 +204,7 @@ public class SqlClient {
 				// remove mode
 				final String[] modeArgs = Arrays.copyOfRange(args, 1, args.length);
 				final CliOptions options = CliOptionsParser.parseEmbeddedModeClient(modeArgs);
+
 				if (options.isPrintHelp()) {
 					CliOptionsParser.printHelpEmbeddedModeClient();
 				} else {

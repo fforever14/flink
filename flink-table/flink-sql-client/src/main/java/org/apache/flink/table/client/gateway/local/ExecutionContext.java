@@ -18,6 +18,7 @@
 
 package org.apache.flink.table.client.gateway.local;
 
+import org.apache.commons.cli.Option;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies.FailureRateRestartStrategyConfiguration;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies.FallbackRestartStrategyConfiguration;
@@ -26,6 +27,7 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies.NoRestartSt
 import org.apache.flink.api.common.restartstrategy.RestartStrategies.RestartStrategyConfiguration;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.dag.Pipeline;
+import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.client.ClientUtils;
 import org.apache.flink.client.cli.CliArgsException;
@@ -43,12 +45,7 @@ import org.apache.flink.configuration.RestartStrategyOptions;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.environment.StreamPipelineOptions;
-import org.apache.flink.table.api.EnvironmentSettings;
-import org.apache.flink.table.api.Table;
-import org.apache.flink.table.api.TableConfig;
-import org.apache.flink.table.api.TableEnvironment;
-import org.apache.flink.table.api.TableException;
-import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.api.*;
 import org.apache.flink.table.api.bridge.java.BatchTableEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.bridge.java.internal.BatchTableEnvironmentImpl;
@@ -142,6 +139,7 @@ public class ExecutionContext<ClusterID> {
 	private final ClassLoader classLoader;
 
 	private final Configuration flinkConfig;
+	private final TableConfig tableConfig;
 	private final ClusterClientFactory<ClusterID> clusterClientFactory;
 	private final ClusterID clusterId;
 	private final ClusterSpecification clusterSpec;
@@ -150,6 +148,8 @@ public class ExecutionContext<ClusterID> {
 	private ExecutionEnvironment execEnv;
 	private StreamExecutionEnvironment streamExecEnv;
 	private Executor executor;
+	private StatementSet statementSet;
+	private Planner planner;
 
 	// Members that should be reused in the same session.
 	private SessionState sessionState;
@@ -167,7 +167,7 @@ public class ExecutionContext<ClusterID> {
 		this.originalSessionContext = originalSessionContext;
 
 		this.flinkConfig = flinkConfig;
-
+		this.tableConfig = createTableConfig();
 		if (containsPythonFunction(environment)) {
 			dependencies = addPythonDependency(dependencies);
 		}
@@ -267,6 +267,32 @@ public class ExecutionContext<ClusterID> {
 
 	public TableEnvironment getTableEnvironment() {
 		return tableEnv;
+	}
+
+	public StatementSet createStatementSet() {
+		if (!environment.getExecution().isStreamingPlanner()) {
+			throw new TableException("statement support only streaming type");
+		}
+		if (statementSet == null) {
+			statementSet = tableEnv.createStatementSet();
+		}
+		return statementSet;
+	}
+
+	public StatementSet getStatementSet() {
+		return this.statementSet;
+	}
+
+	public Pipeline createStatementPipeline(String jobName) {
+		List<Transformation<?>> transformations = this.planner.translate(getStatementSet().getOperations());
+		return executor.createPipeline(transformations, this.tableConfig, jobName);
+	}
+
+	public void addMultiInsertSql(String sql) {
+		if (statementSet == null) {
+			throw new TableException("statement not exist, you should call createStatementSet first");
+		}
+		statementSet.addInsertSql(sql);
 	}
 
 	public ExecutionConfig getExecutionConfig() {
@@ -417,7 +443,7 @@ public class ExecutionContext<ClusterID> {
 		throw new SqlExecutionException("Unsupported execution type for sinks.");
 	}
 
-	private static TableEnvironment createStreamTableEnvironment(
+	private TableEnvironment createStreamTableEnvironment(
 			StreamExecutionEnvironment env,
 			EnvironmentSettings settings,
 			TableConfig config,
@@ -428,7 +454,7 @@ public class ExecutionContext<ClusterID> {
 			ClassLoader userClassLoader) {
 
 		final Map<String, String> plannerProperties = settings.toPlannerProperties();
-		final Planner planner = ComponentFactoryService.find(PlannerFactory.class, plannerProperties)
+		this.planner = ComponentFactoryService.find(PlannerFactory.class, plannerProperties)
 			.create(plannerProperties, executor, config, functionCatalog, catalogManager);
 
 		return new StreamTableEnvironmentImpl(
@@ -465,8 +491,6 @@ public class ExecutionContext<ClusterID> {
 	private void initializeTableEnvironment(@Nullable SessionState sessionState) {
 		final EnvironmentSettings settings = environment.getExecution().getEnvironmentSettings();
 		final boolean noInheritedState = sessionState == null;
-		// Step 0.0 Initialize the table configuration.
-		final TableConfig config = createTableConfig();
 
 		if (noInheritedState) {
 			//--------------------------------------------------------------------------------------------------------------
@@ -479,7 +503,7 @@ public class ExecutionContext<ClusterID> {
 			// Step 1.1 Initialize the CatalogManager if required.
 			final CatalogManager catalogManager = CatalogManager.newBuilder()
 				.classLoader(classLoader)
-				.config(config.getConfiguration())
+				.config(this.tableConfig.getConfiguration())
 				.defaultCatalog(
 					settings.getBuiltInCatalogName(),
 					new GenericInMemoryCatalog(
@@ -488,13 +512,13 @@ public class ExecutionContext<ClusterID> {
 				.build();
 
 			// Step 1.2 Initialize the FunctionCatalog if required.
-			final FunctionCatalog functionCatalog = new FunctionCatalog(config, catalogManager, moduleManager);
+			final FunctionCatalog functionCatalog = new FunctionCatalog(this.tableConfig, catalogManager, moduleManager);
 
 			// Step 1.3 Set up session state.
 			this.sessionState = SessionState.of(catalogManager, moduleManager, functionCatalog);
 
 			// Must initialize the table environment before actually the
-			createTableEnvironment(settings, config, catalogManager, moduleManager, functionCatalog);
+			createTableEnvironment(settings, this.tableConfig, catalogManager, moduleManager, functionCatalog);
 
 			//--------------------------------------------------------------------------------------------------------------
 			// Step.2 Create modules and load them into the TableEnvironment.
@@ -526,7 +550,7 @@ public class ExecutionContext<ClusterID> {
 			this.sessionState = sessionState;
 			createTableEnvironment(
 					settings,
-					config,
+					this.tableConfig,
 					sessionState.catalogManager,
 					sessionState.moduleManager,
 					sessionState.functionCatalog);

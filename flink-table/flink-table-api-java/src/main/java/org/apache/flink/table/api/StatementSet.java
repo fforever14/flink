@@ -19,6 +19,9 @@
 package org.apache.flink.table.api;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.table.operations.ModifyOperation;
+
+import java.util.List;
 
 /**
  * A {@link StatementSet} accepts DML statements or {@link Table}s,
@@ -62,4 +65,11 @@ public interface StatementSet {
 	 * <p>The added statements and Tables will be cleared when executing this method.
 	 */
 	TableResult execute();
+
+	/**
+	 * get ModifyOperation list has added.
+	 *
+	 * @return
+	 */
+	List<ModifyOperation> getOperations();
 }

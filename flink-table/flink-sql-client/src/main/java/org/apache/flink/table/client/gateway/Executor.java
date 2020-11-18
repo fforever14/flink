@@ -182,4 +182,14 @@ public interface Executor {
 	 * @return information about the target of the submitted Flink job
 	 */
 	ProgramTargetDescriptor executeUpdate(String sessionId, String statement) throws SqlExecutionException;
+
+	void startMultipleInsertInto(String sessionId);
+
+	void addMultiInsertIntoSql(String sessionId, String sql);
+
+	ProgramTargetDescriptor executeMultipleInsertInto(String sessionId) throws SqlExecutionException;
+
+	String getCurrentCatalog(String sessionId);
+
+	String getCurrentDatabase(String sessionId);
 }

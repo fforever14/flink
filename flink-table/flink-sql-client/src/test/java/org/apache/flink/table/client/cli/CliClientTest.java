@@ -500,5 +500,30 @@ public class CliClientTest extends TestLogger {
 			JobID jobID = JobID.generate();
 			return new ProgramTargetDescriptor(jobID);
 		}
+
+		@Override
+		public void startMultipleInsertInto(String sessionId) {
+
+		}
+
+		@Override
+		public void addMultiInsertIntoSql(String sessionId, String sql) {
+
+		}
+
+		@Override
+		public ProgramTargetDescriptor executeMultipleInsertInto(String sessionId) throws SqlExecutionException {
+			return null;
+		}
+
+		@Override
+		public String getCurrentCatalog(String sessionId) {
+			return null;
+		}
+
+		@Override
+		public String getCurrentDatabase(String sessionId) {
+			return null;
+		}
 	}
 }

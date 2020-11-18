@@ -99,4 +99,9 @@ class StatementSetImpl implements StatementSet {
 			operations.clear();
 		}
 	}
+
+	@Override
+	public List<ModifyOperation> getOperations() {
+		return operations;
+	}
 }

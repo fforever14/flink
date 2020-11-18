@@ -18,6 +18,8 @@
 
 package org.apache.flink.table.client.cli;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.TableSchema;
@@ -42,16 +44,15 @@ import org.jline.utils.InfoCmp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOError;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * SQL CLI client.
@@ -251,11 +252,102 @@ public class CliClient {
 
 	// --------------------------------------------------------------------------------------------
 
+	/**
+	 * 执行Sql文件
+	 * @param filePath
+	 * @return true执行成功  false执行失败
+	 */
+	public boolean executeFile(String filePath, boolean runAsOnce) {
+		File file = new File(filePath);
+		if (!file.exists()) {
+			printError("the sql file do not exist");
+			return false;
+		}
+		String statement;
+		List<String> sqls;
+		try {
+			statement = FileUtils.readFileToString(file);
+			SqlSplitter splitter = new SqlSplitter();
+			sqls = splitter.splitSql(statement);
+		} catch (IOException e){
+			printError("read the sql file error , " + e.getMessage());
+			return false;
+		}
+		if (!runAsOnce) {
+			for (String sql : sqls) {
+				final Optional<SqlCommandCall> parsedStatement = parseCommand(sql);
+				parsedStatement.ifPresent(sqlCommandCall -> {
+					if (FILE_SUPPORT_COMMANDS.contains(sqlCommandCall.command)) {
+						callCommand(sqlCommandCall);
+					}
+				});
+			}
+		} else {
+			boolean isFirstInsert = true;
+			executor.startMultipleInsertInto(sessionId);
+			for (String sql : sqls) {
+				final Optional<SqlCommandCall> parsedStatement = parseCommand(sql);
+				if (!parsedStatement.isPresent()) {
+					continue;
+				}
+				SqlCommandCall sqlCommandCall = parsedStatement.get();
+				boolean isInsert = isInsert(sqlCommandCall.command);
+				if (isInsert) {
+					if (isFirstInsert) {
+						this.executor.startMultipleInsertInto(sessionId);
+						isFirstInsert = false;
+					}
+					this.executor.addMultiInsertIntoSql(sessionId, sql);
+				} else if (FILE_SUPPORT_COMMANDS.contains(sqlCommandCall.command)) {
+					callCommand(sqlCommandCall);
+				}
+			}
+			try {
+				this.executor.executeMultipleInsertInto(sessionId);
+			} catch (Exception e) {
+				e.printStackTrace();
+				printError("execute Multi Insert error: " + e.getMessage());
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static final boolean isInsert(SqlCommandParser.SqlCommand command) {
+		return command == SqlCommandParser.SqlCommand.INSERT_INTO
+			|| command == SqlCommandParser.SqlCommand.INSERT_OVERWRITE;
+	}
+
+	/**
+	 * 执行SQL文件时可执行的指令
+	 */
+	private static final List<SqlCommandParser.SqlCommand> FILE_SUPPORT_COMMANDS = Arrays.asList(
+		SqlCommandParser.SqlCommand.USE_CATALOG,
+		SqlCommandParser.SqlCommand.USE,
+		SqlCommandParser.SqlCommand.SET,
+		SqlCommandParser.SqlCommand.CREATE_CATALOG,
+		SqlCommandParser.SqlCommand.CREATE_DATABASE,
+		SqlCommandParser.SqlCommand.CREATE_FUNCTION,
+		SqlCommandParser.SqlCommand.CREATE_TABLE,
+		SqlCommandParser.SqlCommand.CREATE_VIEW,
+		SqlCommandParser.SqlCommand.ALTER_DATABASE,
+		SqlCommandParser.SqlCommand.ALTER_TABLE,
+		SqlCommandParser.SqlCommand.ALTER_FUNCTION,
+		SqlCommandParser.SqlCommand.DROP_CATALOG,
+		SqlCommandParser.SqlCommand.DROP_DATABASE,
+		SqlCommandParser.SqlCommand.DROP_FUNCTION,
+		SqlCommandParser.SqlCommand.DROP_TABLE,
+		SqlCommandParser.SqlCommand.DROP_VIEW,
+		SqlCommandParser.SqlCommand.INSERT_INTO,
+		SqlCommandParser.SqlCommand.INSERT_OVERWRITE
+	);
+
 	private Optional<SqlCommandCall> parseCommand(String line) {
 		final SqlCommandCall parsedLine;
 		try {
 			parsedLine = SqlCommandParser.parse(executor.getSqlParser(sessionId), line);
 		} catch (SqlExecutionException e) {
+			e.printStackTrace();
 			printExecutionException(e);
 			return Optional.empty();
 		}
@@ -423,9 +515,18 @@ public class CliClient {
 	}
 
 	private void callShowCatalogs() {
-		final List<String> catalogs;
+		List<String> catalogs;
 		try {
 			catalogs = executor.listCatalogs(sessionId);
+			String currentCatalog = executor.getCurrentCatalog(sessionId);
+			if (StringUtils.isNotBlank(currentCatalog)) {
+				catalogs = catalogs.stream().map(catalog -> {
+					if (currentCatalog.equalsIgnoreCase(catalog)) {
+						catalog = catalog + "[current]";
+					}
+					return catalog;
+				}).collect(Collectors.toList());
+			}
 		} catch (SqlExecutionException e) {
 			printExecutionException(e);
 			return;
@@ -439,9 +540,18 @@ public class CliClient {
 	}
 
 	private void callShowDatabases() {
-		final List<String> dbs;
+		List<String> dbs;
 		try {
 			dbs = executor.listDatabases(sessionId);
+			String currentDatabase = executor.getCurrentDatabase(sessionId);
+			if (StringUtils.isNotBlank(currentDatabase)) {
+				dbs = dbs.stream().map(db -> {
+					if (currentDatabase.equalsIgnoreCase(db)) {
+						db = db + "[current]";
+					}
+					return db;
+				}).collect(Collectors.toList());
+			}
 		} catch (SqlExecutionException e) {
 			printExecutionException(e);
 			return;
@@ -557,7 +667,6 @@ public class CliClient {
 			printExecutionException(e);
 			return;
 		}
-
 		if (resultDesc.isTableauMode()) {
 			try (CliTableauResultView tableauResultView = new CliTableauResultView(
 					terminal, executor, sessionId, resultDesc)) {
@@ -587,6 +696,7 @@ public class CliClient {
 				printExecutionException(e);
 			}
 		}
+		printInfo("callSelect end!");
 	}
 
 	private boolean callInsert(SqlCommandCall cmdCall) {

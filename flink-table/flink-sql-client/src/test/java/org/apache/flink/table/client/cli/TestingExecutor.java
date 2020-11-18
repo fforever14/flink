@@ -223,6 +223,31 @@ class TestingExecutor implements Executor {
 		throw new UnsupportedOperationException("Not implemented.");
 	}
 
+	@Override
+	public void startMultipleInsertInto(String sessionId) {
+
+	}
+
+	@Override
+	public void addMultiInsertIntoSql(String sessionId, String sql) {
+
+	}
+
+	@Override
+	public ProgramTargetDescriptor executeMultipleInsertInto(String sessionId) throws SqlExecutionException {
+		return null;
+	}
+
+	@Override
+	public String getCurrentCatalog(String sessionId) {
+		return null;
+	}
+
+	@Override
+	public String getCurrentDatabase(String sessionId) {
+		return null;
+	}
+
 	public int getNumCancelCalls() {
 		return numCancelCalls;
 	}

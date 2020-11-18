@@ -36,10 +36,7 @@ import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.plugin.PluginUtils;
-import org.apache.flink.table.api.Table;
-import org.apache.flink.table.api.TableEnvironment;
-import org.apache.flink.table.api.TableResult;
-import org.apache.flink.table.api.TableSchema;
+import org.apache.flink.table.api.*;
 import org.apache.flink.table.api.internal.TableEnvironmentInternal;
 import org.apache.flink.table.catalog.UnresolvedIdentifier;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
@@ -80,6 +77,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -117,7 +115,7 @@ public class LocalExecutor implements Executor {
 	/**
 	 * Creates a local executor for submitting table programs and retrieving results.
 	 */
-	public LocalExecutor(URL defaultEnv, List<URL> jars, List<URL> libraries) {
+	public LocalExecutor(URL defaultEnv, List<URL> jars, List<URL> libraries, Configuration userConf) {
 		// discover configuration
 		final String flinkConfigDir;
 		try {
@@ -126,12 +124,14 @@ public class LocalExecutor implements Executor {
 
 			// load the global configuration
 			this.flinkConfig = GlobalConfiguration.loadConfiguration(flinkConfigDir);
+			this.flinkConfig.addAll(userConf);
 
 			// initialize default file system
 			FileSystem.initialize(flinkConfig, PluginUtils.createPluginManagerFromRootFolder(flinkConfig));
 
 			// load command lines for deployment
 			this.commandLines = CliFrontend.loadCustomCommandLines(flinkConfig, flinkConfigDir);
+
 			this.commandLineOptions = collectCommandLineOptions(commandLines);
 		} catch (Exception e) {
 			throw new SqlClientException("Could not load Flink configuration.", e);
@@ -744,6 +744,7 @@ public class LocalExecutor implements Executor {
 
 	private static Options collectCommandLineOptions(List<CustomCommandLine> commandLines) {
 		final Options customOptions = new Options();
+		System.out.println("customOptions: " + customOptions.toString());
 		for (CustomCommandLine customCommandLine : commandLines) {
 			customCommandLine.addGeneralOptions(customOptions);
 			customCommandLine.addRunOptions(customOptions);
@@ -763,5 +764,73 @@ public class LocalExecutor implements Executor {
 			builder.field(schema.getFieldNames()[i], convertedType);
 		}
 		return builder.build();
+	}
+
+	@Override
+	public void startMultipleInsertInto(String sessionId) {
+		final ExecutionContext<?> context = getExecutionContext(sessionId);
+		context.createStatementSet();
+	}
+
+	@Override
+	public void addMultiInsertIntoSql(String sessionId, String sql) {
+		final ExecutionContext<?> context = getExecutionContext(sessionId);
+		context.addMultiInsertSql(sql);
+	}
+
+	/**
+	 * 执行多sink任务
+	 * @param sessionId
+	 * @return
+	 * @throws SqlExecutionException
+	 */
+	@Override
+	public ProgramTargetDescriptor executeMultipleInsertInto(String sessionId) throws SqlExecutionException {
+		final ExecutionContext<?> context = getExecutionContext(sessionId);
+		StatementSet statementSet = context.getStatementSet();
+		// create pipeline
+		final String jobName = sessionId + ": " + statementSet.toString();
+		final Pipeline pipeline;
+		try {
+			pipeline = context.createStatementPipeline(jobName);
+		} catch (Throwable t) {
+			// catch everything such that the statement does not crash the executor
+			throw new SqlExecutionException("Invalid SQL statement.", t);
+		}
+
+		// create a copy so that we can change settings without affecting the original config
+		Configuration configuration = new Configuration(context.getFlinkConfig());
+		// for update queries we don't wait for the job result, so run in detached mode
+		configuration.set(DeploymentOptions.ATTACHED, false);
+
+		// create execution
+		final ProgramDeployer deployer = new ProgramDeployer(configuration, jobName, pipeline);
+
+		// wrap in classloader because CodeGenOperatorFactory#getStreamOperatorClass
+		// requires to access UDF in deployer.deploy().
+		return context.wrapClassLoader(() -> {
+			try {
+				// blocking deployment
+				JobClient jobClient = deployer.deploy().get();
+				return ProgramTargetDescriptor.of(jobClient.getJobID());
+			} catch (Exception e) {
+				throw new RuntimeException("Error running SQL job.", e);
+			}
+		});
+
+	}
+
+	@Override
+	public String getCurrentCatalog(String sessionId) {
+		final ExecutionContext<?> context = getExecutionContext(sessionId);
+		final TableEnvironment tEnv = context.getTableEnvironment();
+		return tEnv.getCurrentCatalog();
+	}
+
+	@Override
+	public String getCurrentDatabase(String sessionId) {
+		final ExecutionContext<?> context = getExecutionContext(sessionId);
+		final TableEnvironment tEnv = context.getTableEnvironment();
+		return tEnv.getCurrentDatabase();
 	}
 }

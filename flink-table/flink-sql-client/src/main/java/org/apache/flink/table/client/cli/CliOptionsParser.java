@@ -136,6 +136,31 @@ public class CliOptionsParser {
 							"auto-generate one under your user's home directory.")
 			.build();
 
+	public static final Option OPTION_SQL_FILE = Option
+			.builder("f")
+			.required(false)
+			.longOpt("file")
+			.numberOfArgs(1)
+			.desc(
+				"SQL file to execute!"
+			)
+			.build();
+
+	public static final Option RUN_AS_ONCE = Option
+			.builder("once")
+			.required(false)
+			.longOpt("runAsOnce")
+			.desc("SQL file multi insert run as one job")
+			.build();
+
+	public static final Option YARN_APPLICATION_ID = Option
+			.builder("id")
+			.required(false)
+			.longOpt("applicationId")
+			.numberOfArgs(1)
+			.desc("yarn application id!")
+			.build();
+
 	private static final Options EMBEDDED_MODE_CLIENT_OPTIONS = getEmbeddedModeClientOptions(new Options());
 	private static final Options GATEWAY_MODE_CLIENT_OPTIONS = getGatewayModeClientOptions(new Options());
 	private static final Options GATEWAY_MODE_GATEWAY_OPTIONS = getGatewayModeGatewayOptions(new Options());
@@ -157,6 +182,9 @@ public class CliOptionsParser {
 		options.addOption(PYREQUIREMENTS_OPTION);
 		options.addOption(PYARCHIVE_OPTION);
 		options.addOption(PYEXEC_OPTION);
+		options.addOption(OPTION_SQL_FILE);
+		options.addOption(RUN_AS_ONCE);
+		options.addOption(YARN_APPLICATION_ID);
 		return options;
 	}
 
@@ -270,7 +298,10 @@ public class CliOptionsParser {
 				checkUrls(line, CliOptionsParser.OPTION_LIBRARY),
 				line.getOptionValue(CliOptionsParser.OPTION_UPDATE.getOpt()),
 				line.getOptionValue(CliOptionsParser.OPTION_HISTORY.getOpt()),
-				getPythonConfiguration(line)
+				getPythonConfiguration(line),
+				line.getOptionValue(CliOptionsParser.OPTION_SQL_FILE.getOpt()),
+				line.hasOption(CliOptionsParser.RUN_AS_ONCE.getOpt()),
+				line.getOptionValue(CliOptionsParser.YARN_APPLICATION_ID.getOpt())
 			);
 		}
 		catch (ParseException e) {
@@ -291,7 +322,10 @@ public class CliOptionsParser {
 				checkUrls(line, CliOptionsParser.OPTION_LIBRARY),
 				line.getOptionValue(CliOptionsParser.OPTION_UPDATE.getOpt()),
 				line.getOptionValue(CliOptionsParser.OPTION_HISTORY.getOpt()),
-				getPythonConfiguration(line)
+				getPythonConfiguration(line),
+				line.getOptionValue(CliOptionsParser.OPTION_SQL_FILE.getOpt()),
+				line.hasOption(CliOptionsParser.RUN_AS_ONCE.getOpt()),
+				line.getOptionValue(CliOptionsParser.YARN_APPLICATION_ID.getOpt())
 			);
 		}
 		catch (ParseException e) {
@@ -312,7 +346,10 @@ public class CliOptionsParser {
 				checkUrls(line, CliOptionsParser.OPTION_LIBRARY),
 				null,
 				null,
-				getPythonConfiguration(line)
+				getPythonConfiguration(line),
+				line.getOptionValue(CliOptionsParser.OPTION_SQL_FILE.getOpt()),
+				line.hasOption(CliOptionsParser.RUN_AS_ONCE.getOpt()),
+				line.getOptionValue(CliOptionsParser.YARN_APPLICATION_ID.getOpt())
 			);
 		}
 		catch (ParseException e) {

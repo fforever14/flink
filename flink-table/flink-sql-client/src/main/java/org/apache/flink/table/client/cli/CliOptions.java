@@ -38,6 +38,9 @@ public class CliOptions {
 	private final String updateStatement;
 	private final String historyFilePath;
 	private final Configuration pythonConfiguration;
+	private final String sqlFilePath;
+	private final boolean runAsOnce;
+	private final Configuration configuration;
 
 	public CliOptions(
 			boolean isPrintHelp,
@@ -48,7 +51,10 @@ public class CliOptions {
 			List<URL> libraryDirs,
 			String updateStatement,
 			String historyFilePath,
-			Configuration pythonConfiguration) {
+			Configuration pythonConfiguration,
+			String sqlFilePath,
+			boolean runAsOnce,
+			String applicationId) {
 		this.isPrintHelp = isPrintHelp;
 		this.sessionId = sessionId;
 		this.environment = environment;
@@ -58,6 +64,12 @@ public class CliOptions {
 		this.updateStatement = updateStatement;
 		this.historyFilePath = historyFilePath;
 		this.pythonConfiguration = pythonConfiguration;
+		this.sqlFilePath = sqlFilePath;
+		this.runAsOnce = runAsOnce;
+		this.configuration = new Configuration();
+		if (applicationId != null) {
+			configuration.setString("yid", applicationId);
+		}
 	}
 
 	public boolean isPrintHelp() {
@@ -94,5 +106,17 @@ public class CliOptions {
 
 	public Configuration getPythonConfiguration() {
 		return pythonConfiguration;
+	}
+
+	public String getSqlFilePath() {
+		return sqlFilePath;
+	}
+
+	public boolean isRunAsOnce() {
+		return runAsOnce;
+	}
+
+	public Configuration getConfiguration() {
+		return configuration;
 	}
 }

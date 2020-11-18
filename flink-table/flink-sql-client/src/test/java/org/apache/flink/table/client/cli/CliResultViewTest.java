@@ -256,6 +256,31 @@ public class CliResultViewTest {
 		public ProgramTargetDescriptor executeUpdate(String sessionId, String statement) throws SqlExecutionException {
 			return null;
 		}
+
+		@Override
+		public void startMultipleInsertInto(String sessionId) {
+
+		}
+
+		@Override
+		public void addMultiInsertIntoSql(String sessionId, String sql) {
+
+		}
+
+		@Override
+		public ProgramTargetDescriptor executeMultipleInsertInto(String sessionId) throws SqlExecutionException {
+			return null;
+		}
+
+		@Override
+		public String getCurrentCatalog(String sessionId) {
+			return null;
+		}
+
+		@Override
+		public String getCurrentDatabase(String sessionId) {
+			return null;
+		}
 	}
 
 	private static final class TestingCliResultView implements Runnable {
