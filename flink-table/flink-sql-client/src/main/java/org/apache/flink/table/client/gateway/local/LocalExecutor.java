@@ -593,6 +593,7 @@ public class LocalExecutor implements Executor {
 			try {
 				// blocking deployment
 				JobClient jobClient = deployer.deploy().get();
+				System.out.println("deploy job success: " + jobClient.getJobID().toString());
 				return ProgramTargetDescriptor.of(jobClient.getJobID());
 			} catch (Exception e) {
 				throw new RuntimeException("Error running SQL job.", e);
@@ -812,6 +813,7 @@ public class LocalExecutor implements Executor {
 			try {
 				// blocking deployment
 				JobClient jobClient = deployer.deploy().get();
+				System.out.println("deploy job success: " + jobClient.getJobID().toString());
 				return ProgramTargetDescriptor.of(jobClient.getJobID());
 			} catch (Exception e) {
 				throw new RuntimeException("Error running SQL job.", e);
