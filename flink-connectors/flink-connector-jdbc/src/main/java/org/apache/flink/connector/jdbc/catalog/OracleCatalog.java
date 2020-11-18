@@ -120,10 +120,16 @@ public class OracleCatalog extends AbstractJdbcCatalog {
 					" and b.constraint_type = 'P' and a.table_name = '" + tablePath.getObjectName().toUpperCase() + "'"
 			);
 			ResultSet pkeyRs = stat.executeQuery();
-			if (pkeyRs.next()) {
-				String[] pkeyArr = new String[1];
-				pkeyArr[0] = pkeyRs.getString(2);
-				tableBuilder.primaryKey(pkeyRs.getString(1), pkeyArr);
+			String pkeyName = null;
+			List<String> pkeyList = new ArrayList<>();
+			while (pkeyRs.next()) {
+				if (pkeyName == null) {
+					pkeyName = pkeyRs.getString(1);
+				}
+				pkeyList.add(pkeyRs.getString(2));
+			}
+			if (pkeyName != null) {
+				tableBuilder.primaryKey(pkeyName, pkeyList.toArray(new String[pkeyList.size()]));
 			}
 
 			TableSchema tableSchema = tableBuilder.build();

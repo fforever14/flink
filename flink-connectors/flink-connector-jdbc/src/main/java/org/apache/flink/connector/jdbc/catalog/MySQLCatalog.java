@@ -122,33 +122,59 @@ public class MySQLCatalog extends AbstractJdbcCatalog {
 
 		String dbUrl = baseUrl + tablePath.getDatabaseName();
 		try (Connection conn = DriverManager.getConnection(dbUrl, username, pwd)) {
-			DatabaseMetaData metaData = conn.getMetaData();
-			Optional<UniqueConstraint> primaryKey = getPrimaryKey(
-				metaData,
-				tablePath.getDatabaseName(),
-				tablePath.getObjectName());
-
 			PreparedStatement ps = conn.prepareStatement(
-				String.format("SELECT * FROM %s;", tablePath.getFullName()));
+				"select COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, NUMERIC_PRECISION, NUMERIC_SCALE, DATETIME_PRECISION" +
+					" from information_schema.COLUMNS" +
+					" WHERE TABLE_NAME = '" + tablePath.getObjectName() + "'" +
+					" AND TABLE_SCHEMA = '" + tablePath.getDatabaseName() + "'" +
+					" ORDER BY ORDINAL_POSITION"
+			);
 
-			ResultSetMetaData rsmd = ps.getMetaData();
+			ResultSet rs = ps.executeQuery();
+			List<String> cols = new ArrayList<>();
+			List<DataType> dataTypes = new ArrayList<>();
 
-			String[] names = new String[rsmd.getColumnCount()];
-			DataType[] types = new DataType[rsmd.getColumnCount()];
-
-			for (int i = 1; i <= rsmd.getColumnCount(); i++) {
-				names[i - 1] = rsmd.getColumnName(i);
-				types[i - 1] = fromJDBCType(rsmd, i);
-				if (rsmd.isNullable(i) == ResultSetMetaData.columnNoNulls) {
-					types[i - 1] = types[i - 1].notNull();
+			PreparedStatement stat = conn.prepareStatement(
+				"select kcu.CONSTRAINT_NAME, kcu.COLUMN_NAME from information_schema.KEY_COLUMN_USAGE kcu " +
+					"inner join information_schema.TABLE_CONSTRAINTS tc " +
+					"using (constraint_name,table_schema,table_name) " +
+					"where tc.CONSTRAINT_TYPE = 'PRIMARY KEY' " +
+					"and kcu.TABLE_SCHEMA = '" + tablePath.getDatabaseName() + "' " +
+					"and kcu.TABLE_NAME = '" + tablePath.getObjectName() + "' " +
+					"order by kcu.TABLE_NAME, kcu.ORDINAL_POSITION"
+			);
+			ResultSet pkeyRs = stat.executeQuery();
+			String pkeyName = null;
+			List<String> pkeyList = new ArrayList<>();
+			while (pkeyRs.next()) {
+				if (pkeyName == null) {
+					pkeyName = pkeyRs.getString(1);
 				}
+				pkeyList.add(pkeyRs.getString(2));
 			}
 
-			TableSchema.Builder tableBuilder = new TableSchema.Builder()
-				.fields(names, types);
-			primaryKey.ifPresent(pk ->
-				tableBuilder.primaryKey(pk.getName(), pk.getColumns().toArray(new String[0]))
-			);
+			TableSchema.Builder tableBuilder = new TableSchema.Builder();
+
+			while (rs.next()) {
+				String columnName = rs.getString(1);
+				String dataType = rs.getString(2);
+				Long charLength = rs.getLong(3);
+				Long numPrecision = rs.getLong(4);
+				Long numScale = rs.getLong(5);
+				Long datetimePrecision = rs.getLong(6);
+				cols.add(columnName);
+				dataTypes.add(fromJDBCType(dataType, charLength, numPrecision, numScale, datetimePrecision, pkeyList.contains(columnName)));
+			}
+
+			for (int i = 0, length = cols.size(); i < length; i++) {
+				tableBuilder.field(cols.get(i), dataTypes.get(i));
+			}
+
+
+			if (pkeyName != null) {
+				tableBuilder.primaryKey(pkeyName, pkeyList.toArray(new String[pkeyList.size()]));
+			}
+
 			TableSchema tableSchema = tableBuilder.build();
 
 			Map<String, String> props = new HashMap<>();
@@ -201,40 +227,56 @@ public class MySQLCatalog extends AbstractJdbcCatalog {
 	public static final String MYSQL_FLOW = "float";
 	public static final String MYSQL_TIME = "time";
 
-	private DataType fromJDBCType(ResultSetMetaData metadata, int colIndex) throws SQLException {
-		String dataType = metadata.getColumnTypeName(colIndex).toLowerCase();
-		int precision = metadata.getPrecision(colIndex);
-		int scale = metadata.getScale(colIndex);
+	private DataType fromJDBCType(String dataType, Long charLength, Long numPrecision, Long numScale, Long datetimePrecision, boolean isPrimaryKey) throws SQLException {
+		DataType rst = null;
 		switch(dataType) {
 			case MYSQL_INT:
 			case MYSQL_INTEGER:
-				return DataTypes.INT();
+				rst = DataTypes.INT();
+				break;
 			case MYSQL_TINYINT:
 			case MYSQL_TINYINT_UNSIGHED:
-				return DataTypes.TINYINT();
+				rst =  DataTypes.TINYINT();
+				break;
 			case MYSQL_SMALLINT:
 			case MYSQL_SMALLINT_UNSIGHED:
-				return DataTypes.SMALLINT();
+				rst =  DataTypes.SMALLINT();
+				break;
 			case MYSQL_BIGINT:
 			case MYSQL_BIGINT_UNSIGNED:
 			case MYSQL_INT_UNSIGNED:
-				return DataTypes.BIGINT();
+				rst =  DataTypes.BIGINT();
+				break;
 			case MYSQL_VARCHAR:
-				return DataTypes.VARCHAR(precision);
+				rst =  DataTypes.VARCHAR(charLength.intValue());
+				break;
 			case MYSQL_LONGTEXT:
 			case MYSQL_TEXT:
 			case MYSQL_MEDIUMTEXT:
-				return DataTypes.STRING();
+				rst =  DataTypes.STRING();
+				break;
 			case MYSQL_DATETIME:
-				return DataTypes.TIMESTAMP(3);
+				rst =  DataTypes.TIMESTAMP(datetimePrecision.intValue());
+				break;
 			case MYSQL_DECIMAL:
 			case MYSQL_NUMERIC:
-				return DataTypes.DECIMAL(precision, scale);
+				if (numPrecision <= 0) {
+					numPrecision = 1L;
+				}
+				rst =  DataTypes.DECIMAL(numPrecision.intValue(), numScale.intValue());
+				break;
+			case MYSQL_DOUBLE:
+				rst =  DataTypes.DOUBLE();
+				break;
 			default:
 				throw new UnsupportedOperationException(
 					String.format("Doesn't support MySQL type '%s' yet", dataType));
 
 		}
+		if (isPrimaryKey) {
+			rst = rst.notNull();
+		}
+		return rst;
 	}
 
 	@Override
