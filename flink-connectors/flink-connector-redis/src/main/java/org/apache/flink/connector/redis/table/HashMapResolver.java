@@ -4,8 +4,9 @@ import io.lettuce.core.api.sync.RedisCommands;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.types.RowKind;
 
-public class HashMapResolver extends RedisDataResolver<RowData>{
+public class HashMapResolver extends RedisDataResolver {
 
 	private RowData.FieldGetter keyGetter;
 	private RowData.FieldGetter hashKeyGetter;
@@ -33,10 +34,16 @@ public class HashMapResolver extends RedisDataResolver<RowData>{
 
 	@Override
 	public void invoke(RowData value, RedisCommands<String, String> commands, SinkFunction.Context context) {
+		RowKind rowKind = value.getRowKind();
 		RedisData data = resolve(value);
-		commands.hset(data.getKey(), data.getHashKey(), data.getValue());
-		if (conf.getTtl() > 0) {
-			commands.expire(data.getKey(), conf.getTtl());
+		if (RowKind.INSERT.equals(rowKind) || RowKind.UPDATE_BEFORE.equals(rowKind)) {
+			commands.hset(data.getKey(), data.getHashKey(), data.getValue());
+			if (conf.getTtl() > 0) {
+				commands.expire(data.getKey(), conf.getTtl());
+			}
+		}
+		if (RowKind.DELETE.equals(rowKind)) {
+			commands.hdel(data.getKey(), data.getHashKey());
 		}
 	}
 }

@@ -5,16 +5,17 @@ import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.sync.RedisCommands;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
+import org.apache.flink.table.data.RowData;
 
-public class RedisSinkFunction<T> extends RichSinkFunction<T> {
+public class RedisSinkFunction extends RichSinkFunction<RowData> {
 
 	protected RedisURI redisURI;
-	protected RedisDataResolver<T> resolver;
+	protected RedisDataResolver resolver;
 	protected RedisClient redisClient;
 	protected RedisCommands<String, String> commands;
 
 
-	public RedisSinkFunction(RedisURI redisURI, RedisDataResolver<T> resolver) {
+	public RedisSinkFunction(RedisURI redisURI, RedisDataResolver resolver) {
 		this.redisURI = redisURI;
 		this.resolver = resolver;
 	}
@@ -35,7 +36,7 @@ public class RedisSinkFunction<T> extends RichSinkFunction<T> {
 	}
 
 	@Override
-	public void invoke(T value, Context context) throws Exception {
+	public void invoke(RowData value, Context context) throws Exception {
 		resolver.invoke(value, commands, context);
 	}
 }
