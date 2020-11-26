@@ -98,27 +98,13 @@ public class OracleCatalog extends AbstractJdbcCatalog {
 			List<String> cols = new ArrayList<>();
 			List<DataType> dataTypes = new ArrayList<>();
 
-			while (rs.next()) {
-				String columnName = rs.getString(1);
-				String dataType = rs.getString(2);
-				Integer dataLength = rs.getInt(3);
-				Integer precision = rs.getInt(4);
-				Integer scale = rs.getInt(5);
-				cols.add(columnName);
-				dataTypes.add(fromJDBCType(dataType, dataLength, precision, scale));
-			}
-
-			TableSchema.Builder tableBuilder = new TableSchema.Builder();
-			for (int i = 0, length = cols.size(); i < length; i++) {
-				tableBuilder.field(cols.get(i), dataTypes.get(i));
-			}
-
 			PreparedStatement stat = conn.prepareStatement(
 				"select a.constraint_name,  a.column_name " +
 					" from user_cons_columns a, user_constraints b " +
 					" where a.constraint_name = b.constraint_name " +
 					" and b.constraint_type = 'P' and a.table_name = '" + tablePath.getObjectName().toUpperCase() + "'"
 			);
+
 			ResultSet pkeyRs = stat.executeQuery();
 			String pkeyName = null;
 			List<String> pkeyList = new ArrayList<>();
@@ -128,6 +114,23 @@ public class OracleCatalog extends AbstractJdbcCatalog {
 				}
 				pkeyList.add(pkeyRs.getString(2));
 			}
+
+			TableSchema.Builder tableBuilder = new TableSchema.Builder();
+
+			while (rs.next()) {
+				String columnName = rs.getString(1);
+				String dataType = rs.getString(2);
+				Integer dataLength = rs.getInt(3);
+				Integer precision = rs.getInt(4);
+				Integer scale = rs.getInt(5);
+				cols.add(columnName);
+				dataTypes.add(fromJDBCType(dataType, dataLength, precision, scale, pkeyList.contains(columnName)));
+			}
+
+			for (int i = 0, length = cols.size(); i < length; i++) {
+				tableBuilder.field(cols.get(i), dataTypes.get(i));
+			}
+
 			if (pkeyName != null) {
 				tableBuilder.primaryKey(pkeyName, pkeyList.toArray(new String[pkeyList.size()]));
 			}
@@ -163,13 +166,16 @@ public class OracleCatalog extends AbstractJdbcCatalog {
 	public static final String ORACLE_TIMESTAMP_WITH_LOCAL_TIME_ZONE = "TIMESTAMP WITH LOCAL TIME ZONE";
 	public static final String ORACLE_TINYINT = "TINYINT";
 
-	private DataType fromJDBCType(String dataType, Integer dataLength, Integer precision, Integer scale) {
+	private DataType fromJDBCType(String dataType, Integer dataLength, Integer precision, Integer scale, Boolean isPrimaryKey) {
+		DataType rst = null;
 		if (dataType.startsWith(ORACLE_TIMESTAMP)) {
 			switch (dataType) {
 				case ORACLE_TIMESTAMP_WITH_TIME_ZONE:
-					return DataTypes.TIMESTAMP_WITH_TIME_ZONE();
+					rst = DataTypes.TIMESTAMP_WITH_TIME_ZONE();
+					break;
 				case ORACLE_TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-					return DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE();
+					rst =  DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE();
+					break;
 				default:
 					String[] arr = dataType.split("\\(");
 					if (arr.length == 2) {
@@ -182,35 +188,49 @@ public class OracleCatalog extends AbstractJdbcCatalog {
 		} else {
 			switch (dataType) {
 				case ORACLE_VARCHAR:
-					return DataTypes.VARCHAR(dataLength);
+					rst =  DataTypes.VARCHAR(dataLength);
+					break;
 				case ORACLE_NVARCHAR:
 				case ORACLE_VARCHAR2:
 				case ORACLE_NVARCHAR2:
-					return DataTypes.STRING();
+					rst =  DataTypes.STRING();
+					break;
 				case ORACLE_INTEGER:
-					return DataTypes.INT();
+					rst =  DataTypes.INT();
+					break;
 				case ORACLE_TINYINT:
-					return DataTypes.TINYINT();
+					rst =  DataTypes.TINYINT();
+					break;
 				case ORACLE_CHAR:
-					return DataTypes.CHAR(dataLength);
+					rst =  DataTypes.CHAR(dataLength);
+					break;
 				case ORACLE_FLOAT:
-					return DataTypes.FLOAT();
+					rst =  DataTypes.FLOAT();
+					break;
 				case ORACLE_LONG:
-					return DataTypes.BIGINT();
+					rst =  DataTypes.BIGINT();
+					break;
 				case ORACLE_NUMBER:
 					if (precision == 0) {
 						precision = OracleDialect.ORACLE_MAX_PRECISION;
 					}
-					return DataTypes.DECIMAL(precision, scale);
+					rst =  DataTypes.DECIMAL(precision, scale);
+					break;
 				case ORACLE_DOUBLE:
-					return DataTypes.DOUBLE();
+					rst =  DataTypes.DOUBLE();
+					break;
 				case ORACLE_DATE:
-					return DataTypes.TIMESTAMP(0);
+					rst =  DataTypes.TIMESTAMP(0);
+					break;
 				default:
 					throw new UnsupportedOperationException(
 						String.format("Doesn't support Oracle type '%s' yet", dataType));
 			}
 		}
+		if (isPrimaryKey) {
+			rst = rst.notNull();
+		}
+		return rst;
 	}
 
 	@Override
