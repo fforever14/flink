@@ -179,7 +179,7 @@ public class OracleCatalog extends AbstractJdbcCatalog {
 				default:
 					String[] arr = dataType.split("\\(");
 					if (arr.length == 2) {
-						return DataTypes.TIMESTAMP(Integer.parseInt(arr[1].replace("\\)", "")));
+							return DataTypes.TIMESTAMP(Integer.parseInt(arr[1].replace(")", "")));
 					} else {
 						throw new UnsupportedOperationException(
 							String.format("Doesn't support Postgres type '%s' yet", dataType));
