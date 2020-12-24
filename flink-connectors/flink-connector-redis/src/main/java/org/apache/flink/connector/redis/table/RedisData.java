@@ -50,4 +50,14 @@ public class RedisData {
 		this.value = value;
 	}
 
+	@Override
+	public String toString() {
+		return "RedisData{" +
+			"redisType=" + redisType +
+			", key='" + key + '\'' +
+			", hashKey='" + hashKey + '\'' +
+			", ts=" + ts +
+			", value='" + value + '\'' +
+			'}';
+	}
 }

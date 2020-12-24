@@ -7,10 +7,14 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.RowKind;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StringResolver extends RedisDataResolver {
 
 	private RowData.FieldGetter keyGetter;
+
+	protected static final Logger LOG = LoggerFactory.getLogger(StringResolver.class);
 
 	public StringResolver(RedisDataResolveConf conf, SerializationSchema<RowData> serializationSchema) {
 		super(conf, serializationSchema);
@@ -31,7 +35,8 @@ public class StringResolver extends RedisDataResolver {
 	public void invoke(RowData value, RedisCommands<String, String> commands, SinkFunction.Context context) {
 		RowKind rowKind = value.getRowKind();
 		RedisData data = resolve(value);
-		if (RowKind.INSERT.equals(rowKind) || RowKind.UPDATE_BEFORE.equals(rowKind)) {
+		if (RowKind.INSERT.equals(rowKind) || RowKind.UPDATE_BEFORE.equals(rowKind)
+			|| RowKind.UPDATE_AFTER.equals(rowKind)) {
 			commands.set(data.getKey(), data.getValue());
 			if (conf.getTtl() > 0) {
 				commands.expire(data.getKey(), conf.getTtl());
