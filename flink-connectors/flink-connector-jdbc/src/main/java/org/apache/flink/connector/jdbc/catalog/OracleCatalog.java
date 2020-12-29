@@ -68,6 +68,9 @@ public class OracleCatalog extends AbstractJdbcCatalog {
 
 	@Override
 	public List<String> listTables(String databaseName) throws CatalogException {
+		if (!checkDatabase(databaseName)) {
+			throw new CatalogException("Invalid database name, please check database name. Notice: database name should be uppercase!");
+		}
 		List<String> tableLst = new ArrayList<>();
 		try (Connection conn = DriverManager.getConnection(defaultUrl, username, pwd)) {
 			PreparedStatement ps = conn.prepareStatement("SELECT TABLE_NAME FROM USER_TABLES");
@@ -236,5 +239,9 @@ public class OracleCatalog extends AbstractJdbcCatalog {
 	@Override
 	public boolean tableExists(ObjectPath tablePath) throws CatalogException {
 		return listTables(tablePath.getDatabaseName()).contains(tablePath.getObjectName());
+	}
+
+	private boolean checkDatabase(String databaseName) {
+		return this.username.toUpperCase().equals(databaseName);
 	}
 }
