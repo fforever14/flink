@@ -268,7 +268,7 @@ public class CliResultViewTest {
 		}
 
 		@Override
-		public ProgramTargetDescriptor executeMultipleInsertInto(String sessionId) throws SqlExecutionException {
+		public ProgramTargetDescriptor executeMultipleInsertInto(String sessionId, String jobName) throws SqlExecutionException {
 			return null;
 		}
 

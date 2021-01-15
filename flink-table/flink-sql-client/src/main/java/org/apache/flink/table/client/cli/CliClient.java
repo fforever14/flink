@@ -257,7 +257,7 @@ public class CliClient {
 	 * @param filePath
 	 * @return true执行成功  false执行失败
 	 */
-	public boolean executeFile(String filePath, boolean runAsOnce) {
+	public boolean executeFile(String filePath, boolean runAsOnce, String jobName) {
 		File file = new File(filePath);
 		if (!file.exists()) {
 			printError("the sql file do not exist");
@@ -303,7 +303,7 @@ public class CliClient {
 				}
 			}
 			try {
-				this.executor.executeMultipleInsertInto(sessionId);
+				this.executor.executeMultipleInsertInto(sessionId, jobName);
 			} catch (Exception e) {
 				e.printStackTrace();
 				printError("execute Multi Insert error: " + e.getMessage());

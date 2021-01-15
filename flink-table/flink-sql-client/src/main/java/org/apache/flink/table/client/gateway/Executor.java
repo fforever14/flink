@@ -187,7 +187,7 @@ public interface Executor {
 
 	void addMultiInsertIntoSql(String sessionId, String sql);
 
-	ProgramTargetDescriptor executeMultipleInsertInto(String sessionId) throws SqlExecutionException;
+	ProgramTargetDescriptor executeMultipleInsertInto(String sessionId, String jobName) throws SqlExecutionException;
 
 	String getCurrentCatalog(String sessionId);
 

@@ -145,7 +145,7 @@ public class SqlClient {
 			cli = new CliClient(sessionId, executor, historyFilePath);
 			if (StringUtils.isNotBlank(options.getSqlFilePath())) {
 				// execute sql file
-				final boolean success = cli.executeFile(options.getSqlFilePath(), options.isRunAsOnce());
+				final boolean success = cli.executeFile(options.getSqlFilePath(), options.isRunAsOnce(), options.getJobName());
 				if (!success) {
 					throw new SqlClientException("Could not execute given SQL file to cluster.");
 				}

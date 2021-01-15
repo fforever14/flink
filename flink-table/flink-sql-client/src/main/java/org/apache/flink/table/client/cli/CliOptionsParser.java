@@ -161,6 +161,14 @@ public class CliOptionsParser {
 			.desc("yarn application id!")
 			.build();
 
+	public static final Option FLINK_JOB_NAME = Option
+			.builder("jnm")
+			.required(false)
+			.longOpt("jobName")
+			.numberOfArgs(1)
+			.desc("job name of flink job, only effect on runAsOnce is true")
+			.build();
+
 	private static final Options EMBEDDED_MODE_CLIENT_OPTIONS = getEmbeddedModeClientOptions(new Options());
 	private static final Options GATEWAY_MODE_CLIENT_OPTIONS = getGatewayModeClientOptions(new Options());
 	private static final Options GATEWAY_MODE_GATEWAY_OPTIONS = getGatewayModeGatewayOptions(new Options());
@@ -185,6 +193,7 @@ public class CliOptionsParser {
 		options.addOption(OPTION_SQL_FILE);
 		options.addOption(RUN_AS_ONCE);
 		options.addOption(YARN_APPLICATION_ID);
+		options.addOption(FLINK_JOB_NAME);
 		return options;
 	}
 

@@ -41,6 +41,7 @@ public class CliOptions {
 	private final String sqlFilePath;
 	private final boolean runAsOnce;
 	private final Configuration configuration;
+	private final String jobName;
 
 	public CliOptions(
 			boolean isPrintHelp,
@@ -54,7 +55,8 @@ public class CliOptions {
 			Configuration pythonConfiguration,
 			String sqlFilePath,
 			boolean runAsOnce,
-			String applicationId) {
+			String applicationId,
+			String jobName) {
 		this.isPrintHelp = isPrintHelp;
 		this.sessionId = sessionId;
 		this.environment = environment;
@@ -70,6 +72,11 @@ public class CliOptions {
 		if (applicationId != null) {
 			configuration.setString("yid", applicationId);
 		}
+		this.jobName = jobName;
+	}
+
+	public String getJobName() {
+		return jobName;
 	}
 
 	public boolean isPrintHelp() {

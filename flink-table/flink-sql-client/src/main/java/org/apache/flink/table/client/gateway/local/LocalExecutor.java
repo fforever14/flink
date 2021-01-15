@@ -786,11 +786,13 @@ public class LocalExecutor implements Executor {
 	 * @throws SqlExecutionException
 	 */
 	@Override
-	public ProgramTargetDescriptor executeMultipleInsertInto(String sessionId) throws SqlExecutionException {
+	public ProgramTargetDescriptor executeMultipleInsertInto(String sessionId, String jobName) throws SqlExecutionException {
 		final ExecutionContext<?> context = getExecutionContext(sessionId);
 		StatementSet statementSet = context.getStatementSet();
 		// create pipeline
-		final String jobName = sessionId + ": " + statementSet.toString();
+		if (jobName == null) {
+			jobName = sessionId + ": " + statementSet.toString();
+		}
 		final Pipeline pipeline;
 		try {
 			pipeline = context.createStatementPipeline(jobName);
