@@ -793,9 +793,10 @@ public class LocalExecutor implements Executor {
 		if (jobName == null) {
 			jobName = sessionId + ": " + statementSet.toString();
 		}
+		final String finalJobName = jobName;
 		final Pipeline pipeline;
 		try {
-			pipeline = context.createStatementPipeline(jobName);
+			pipeline = context.wrapClassLoader(() -> context.createStatementPipeline(finalJobName));
 		} catch (Throwable t) {
 			// catch everything such that the statement does not crash the executor
 			throw new SqlExecutionException("Invalid SQL statement.", t);

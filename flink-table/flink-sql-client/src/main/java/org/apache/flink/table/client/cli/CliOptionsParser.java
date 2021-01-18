@@ -310,7 +310,8 @@ public class CliOptionsParser {
 				getPythonConfiguration(line),
 				line.getOptionValue(CliOptionsParser.OPTION_SQL_FILE.getOpt()),
 				line.hasOption(CliOptionsParser.RUN_AS_ONCE.getOpt()),
-				line.getOptionValue(CliOptionsParser.YARN_APPLICATION_ID.getOpt())
+				line.getOptionValue(CliOptionsParser.YARN_APPLICATION_ID.getOpt()),
+				line.getOptionValue(CliOptionsParser.FLINK_JOB_NAME.getOpt())
 			);
 		}
 		catch (ParseException e) {
@@ -334,7 +335,8 @@ public class CliOptionsParser {
 				getPythonConfiguration(line),
 				line.getOptionValue(CliOptionsParser.OPTION_SQL_FILE.getOpt()),
 				line.hasOption(CliOptionsParser.RUN_AS_ONCE.getOpt()),
-				line.getOptionValue(CliOptionsParser.YARN_APPLICATION_ID.getOpt())
+				line.getOptionValue(CliOptionsParser.YARN_APPLICATION_ID.getOpt()),
+				line.getOptionValue(CliOptionsParser.FLINK_JOB_NAME.getOpt())
 			);
 		}
 		catch (ParseException e) {
@@ -358,7 +360,8 @@ public class CliOptionsParser {
 				getPythonConfiguration(line),
 				line.getOptionValue(CliOptionsParser.OPTION_SQL_FILE.getOpt()),
 				line.hasOption(CliOptionsParser.RUN_AS_ONCE.getOpt()),
-				line.getOptionValue(CliOptionsParser.YARN_APPLICATION_ID.getOpt())
+				line.getOptionValue(CliOptionsParser.YARN_APPLICATION_ID.getOpt()),
+				line.getOptionValue(CliOptionsParser.FLINK_JOB_NAME.getOpt())
 			);
 		}
 		catch (ParseException e) {
