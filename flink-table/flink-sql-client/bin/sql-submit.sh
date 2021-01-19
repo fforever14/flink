@@ -167,9 +167,9 @@ if [ -n "$runAsOnce" ]; then
 fi
 
 flink_job_log=/tmp/flink-sql-job-start-$(date +%Y%m%d%H%M%S).log
-$bin/sql-client.sh embedded -d $FLINK_CONF_DIR/sql-client-hive.yaml -id $application_id $lib_dir $run_once_conf $sql_file_conf $flink_job_name_conf > $flink_job_log
+$bin/sql-client.sh embedded -d $FLINK_CONF_DIR/sql-client-hive.yaml -id $application_id $lib_dir $run_once_conf $sql_file_conf $flink_job_name_conf > $flink_job_log 2>&1
 
-job_id=`cat $flink_job_log` | grep "deploy job success" | awk '{print $4}'
+job_id=`cat $flink_job_log | grep "deploy job success" | awk '{print $4}'`
 
 if [[ -z "$job_id" ]]; then
   echo "submit job faild, please check log $flink_job_log"

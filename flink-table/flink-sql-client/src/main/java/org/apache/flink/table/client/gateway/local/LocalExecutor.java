@@ -776,7 +776,7 @@ public class LocalExecutor implements Executor {
 	@Override
 	public void addMultiInsertIntoSql(String sessionId, String sql) {
 		final ExecutionContext<?> context = getExecutionContext(sessionId);
-		context.addMultiInsertSql(sql);
+		context.wrapClassLoader(() -> context.addMultiInsertSql(sql));
 	}
 
 	/**
